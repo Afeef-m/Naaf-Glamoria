@@ -43,7 +43,7 @@ export const metadata: Metadata = {
     siteName: "Naaf Glamoria",
     images: [
       {
-        url: "https://naaf-glamoria.vercel.app/images/og-image.png", // Ensure this file exists in your public folder
+        url: "https://naaf-glamoria-one.vercel.app/images/og-image.png", 
         width: 1200,
         height: 630,
         alt: "Naaf Glamoria - Timeless Elegance",
