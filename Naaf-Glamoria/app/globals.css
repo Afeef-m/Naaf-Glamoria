@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #ffffff;
+}
+@theme {
+  --breakpoint-*: initial;
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-lg1: 1200px;
+  --breakpoint-lg2: 1300px;
+  --breakpoint-xl: 1580px;
+  --breakpoint-2xl: 2000px;
+}
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-caslon: var(--font-caslon);
+  --font-librecaslon: var(--font-librecaslon);
+  --font-montserrat: var(--font-montserrat);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #ffffff;
+    --foreground: #ffffff;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* Arabic Font Override */
+html[lang="ar"] body,
+html[lang="ar"] [class*="font-"] {
+  font-family: var(--font-almarai), sans-serif !important;
+}
