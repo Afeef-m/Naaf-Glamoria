@@ -1,5 +1,6 @@
 import Hero from "@/components/hero";
 import { getDictionary } from "@/lib/i18n";
+import ProductGrid from "@/components/product/ProductGrid";
 
 export default async function Page({
   params,
@@ -8,10 +9,14 @@ export default async function Page({
 }) {
   const resolvedParams = await params;
 
-  const locale =
-    resolvedParams.locale === "ar" ? "ar" : "en";
+  const locale = resolvedParams.locale === "ar" ? "ar" : "en";
 
   const dict = getDictionary(locale);
 
-  return <Hero dict={dict} locale={locale} />;
+  return (
+    <>
+      <Hero dict={dict} locale={locale} />;
+      <ProductGrid locale={locale} />
+    </>
+  );
 }

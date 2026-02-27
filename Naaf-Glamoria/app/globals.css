@@ -2,7 +2,7 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #ffffff;
+  --foreground: #154415;
 }
 @theme {
   --breakpoint-*: initial;
@@ -27,7 +27,7 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #ffffff;
-    --foreground: #ffffff;
+    --foreground: #154415;
   }
 }
 
