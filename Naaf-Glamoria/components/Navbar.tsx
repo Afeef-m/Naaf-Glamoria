@@ -2,70 +2,84 @@
 import Image from "next/image";
 import React, { useState } from "react";
 import { Search, Heart, User, ShoppingBag, Menu, X, Globe } from "lucide-react";
-import { useLanguage } from "@/context/LanguageContext";
 import Link from "next/link";
 
-export default function Navbar() {
+export default function Navbar({
+  dict,
+  locale,
+}: {
+  dict: Record<string, string>;
+  locale: "en" | "ar";
+}) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const { language, setLanguage, t } = useLanguage();
 
   return (
     <nav className="absolute top-0 left-0 right-0 z-50 w-full text-[#154415] bg-white">
       <div className="hidden md:flex flex-col w-full">
-        {/* Top Row: Navigation Links */}
         <div className="relative flex justify-center items-center py-4 border-b border-[#154415]">
           <ul className="flex gap-x-8 text-xs font-medium font-montserrat tracking-widest">
             <li>
               <Link href="#" className="hover:text-[#154415] transition-colors">
-                {t("shop")}
+                {dict.shop}
               </Link>
             </li>
             <li>
               <Link href="#" className="hover:text-[#154415] transition-colors">
-                {t("collections")}
+                {dict.collections}
               </Link>
             </li>
             <li>
               {/* Assuming 'OUR VALUES' is a page, using placeholder # for now */}
               <Link href="#" className="hover:text-[#154415] transition-colors">
-                {t("values")}
+                {dict.values}
               </Link>
             </li>
             <li>
               <Link
-                href="/about"
+                href={`/${locale}/about`}
                 className="hover:text-[#154415] transition-colors"
               >
-                {t("about")}
+                {dict.about}
               </Link>
             </li>
             <li>
               <Link
-                href="/contact"
+                href={`/${locale}/contact`}
                 className="hover:text-[#154415] transition-colors"
               >
-                {t("contact")}
+                {dict.contact}
               </Link>
             </li>
           </ul>
 
           {/* Language Selector (Desktop) */}
-          <div className="absolute right-12 flex items-center gap-x-1 text-xs font-medium font-montserrat cursor-pointer">
+          <div className="absolute right-12 flex items-center gap-x-1 text-xs font-medium font-montserrat">
             <Globe className="w-3 h-3 mr-1" />
-            <span
-              className={`${language === "en" ? "font-bold underline" : "text-gray-500 hover:text-[#154415]"}`}
-              onClick={() => setLanguage("en")}
+
+            <Link
+              href="/en"
+              className={
+                locale === "en"
+                  ? "font-bold underline"
+                  : "text-gray-500 hover:text-[#154415]"
+              }
             >
               EN
-            </span>
+            </Link>
+
             <span className="text-gray-400">|</span>
-            <span
-              className={`${language === "ar" ? "font-bold underline" : "text-gray-500 hover:text-[#154415]"}`}
-              onClick={() => setLanguage("ar")}
+
+            <Link
+              href="/ar"
+              className={
+                locale === "ar"
+                  ? "font-bold underline"
+                  : "text-gray-500 hover:text-[#154415]"
+              }
             >
               AR
-            </span>
+            </Link>
           </div>
         </div>
 
@@ -80,7 +94,7 @@ export default function Navbar() {
               >
                 <Search className="w-4 h-4" />
                 <span className="text-xs font-medium font-montserrat tracking-widest">
-                  {t("search")}
+                  {dict.search}
                 </span>
               </button>
             ) : (
@@ -89,7 +103,7 @@ export default function Navbar() {
                 <input
                   type="search"
                   autoFocus
-                  placeholder={t("search")}
+                  placeholder={dict.search}
                   className="outline-none text-xs font-montserrat bg-transparent"
                 />
                 <button onClick={() => setIsSearchOpen(false)}>
@@ -171,7 +185,7 @@ export default function Navbar() {
             {/* Header with Close Button */}
             <div className="flex justify-between items-center mb-8">
               <span className="text-xl font-medium font-montserrat text-[#154415]">
-                {t("menu")}
+                {dict.menu}
               </span>
               <button onClick={() => setIsMenuOpen(false)}>
                 <X className="w-8 h-8 text-[#154415]" />
@@ -186,7 +200,7 @@ export default function Navbar() {
                   className="block hover:text-gray-600 transition-colors text-sm"
                   onClick={() => setIsMenuOpen(false)}
                 >
-                  {t("shop")}
+                  {dict.shop}
                 </Link>
               </li>
               <li>
@@ -195,7 +209,7 @@ export default function Navbar() {
                   className="block hover:text-gray-600 transition-colors text-sm"
                   onClick={() => setIsMenuOpen(false)}
                 >
-                  {t("collections")}
+                  {dict.collections}
                 </Link>
               </li>
               <li>
@@ -204,25 +218,25 @@ export default function Navbar() {
                   className="block hover:text-gray-600 transition-colors text-sm"
                   onClick={() => setIsMenuOpen(false)}
                 >
-                  {t("values")}
+                  {dict.values}
                 </Link>
               </li>
               <li>
                 <Link
-                  href="/about"
+                  href={`/${locale}/about`}
                   className="block hover:text-gray-600 transition-colors text-sm"
                   onClick={() => setIsMenuOpen(false)}
                 >
-                  {t("about")}
+                  {dict.about}
                 </Link>
               </li>
               <li>
                 <Link
-                  href="/contact"
+                  href={`/${locale}/contact`}
                   className="block hover:text-gray-600 transition-colors text-sm"
                   onClick={() => setIsMenuOpen(false)}
                 >
-                  {t("contact")}
+                  {dict.contact}
                 </Link>
               </li>
             </ul>
@@ -232,37 +246,41 @@ export default function Navbar() {
               <div className="flex items-center gap-x-3 text-[#154415]">
                 <Search className="w-5 h-5" />
                 <span className="text-sm font-medium font-montserrat tracking-widest">
-                  {t("search")}
+                  {dict.search}
                 </span>
               </div>
               <div className="flex items-center space-x-3 text-[#154415]">
                 <Heart className="w-5 h-5" />
                 <span className="text-sm font-medium font-montserrat tracking-widest">
-                  {t("wishlist")}
+                  {dict.wishlist}
                 </span>
               </div>
               <div className="flex items-center space-x-3 text-[#154415]">
                 <User className="w-5 h-5" />
                 <span className="text-sm font-medium font-montserrat tracking-widest">
-                  {t("account")}
+                  {dict.account}
                 </span>
               </div>
               {/* Mobile Language Selector */}
               <div className="flex items-center space-x-3 text-[#154415] mt-4">
                 <Globe className="w-5 h-5" />
                 <div className="flex space-x-4">
-                  <button
-                    className={`${language === "en" ? "font-bold underline" : "text-gray-500"}`}
-                    onClick={() => setLanguage("en")}
+                  <Link
+                    href="/en"
+                    className={
+                      locale === "en" ? "font-bold underline" : "text-gray-500"
+                    }
                   >
                     English
-                  </button>
-                  <button
-                    className={`${language === "ar" ? "font-bold underline" : "text-gray-500"}`}
-                    onClick={() => setLanguage("ar")}
+                  </Link>
+                  <Link
+                    href="/ar"
+                    className={
+                      locale === "ar" ? "font-bold underline" : "text-gray-500"
+                    }
                   >
                     العربية
-                  </button>
+                  </Link>
                 </div>
               </div>
             </div>
