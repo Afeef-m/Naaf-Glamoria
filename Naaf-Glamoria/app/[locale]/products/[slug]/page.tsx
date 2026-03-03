@@ -1,7 +1,25 @@
-import { products } from "@/lib/mockProducts";
+import { getProductBySlugServer } from "@/lib/api/product";
+import { IndianRupee } from "lucide-react";
 import Image from "next/image";
+import { notFound } from "next/navigation";
 
-export default async function ProductDetails({
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string; slug: string }>;
+}) {
+  const { locale, slug } = await params;
+
+  const data = await getProductBySlugServer(slug);
+  const product = data.data;
+
+  return {
+    title: product.name[locale === "ar" ? "ar" : "en"],
+    description: product.description[locale === "ar" ? "ar" : "en"],
+  };
+}
+
+export default async function ProductDetailPage({
   params,
 }: {
   params: Promise<{ locale: string; slug: string }>;
@@ -9,26 +27,44 @@ export default async function ProductDetails({
   const { locale, slug } = await params;
   const finalLocale = locale === "ar" ? "ar" : "en";
 
-  const product = products.find((p) => p.slug === slug);
+  try {
+    const data = await getProductBySlugServer(slug);
+    const product = data.data;
 
-  if (!product) {
-    return <div>Product not found</div>;
+    if (!product) return notFound();
+
+    return (
+      <div className="max-w-6xl mx-auto px-6 py-16 grid md:grid-cols-2 gap-12">
+        <div className="relative w-full aspect-square bg-gray-100 rounded-2xl overflow-hidden">
+          <Image
+            src={product.images?.[0] ?? "/images/products/p-placeholder.jpg"}
+            alt={product.name[finalLocale]}
+            fill
+            className="object-cover"
+          />
+        </div>
+
+        <div className="space-y-6">
+          <p className="text-sm uppercase tracking-wide text-gray-400">
+            {product.category?.name?.[finalLocale]}
+          </p>
+
+          <h1 className="text-3xl font-semibold text-[#154415]">
+            {product.name[finalLocale]}
+          </h1>
+
+          <p className="text-gray-600 leading-relaxed">
+            {product.description[finalLocale]}
+          </p>
+
+          <div className="flex items-center gap-2 text-2xl font-bold text-[#154415]">
+            <IndianRupee className="w-5 h-5" />
+            {product.price}
+          </div>
+        </div>
+      </div>
+    );
+  } catch {
+    return notFound();
   }
-
-  return (
-    <div className="p-8">
-      <Image
-        src={product.image}
-        alt={product.name[finalLocale]}
-        fill
-        className="w-full object-cover"
-      />
-
-      <h1 className="text-2xl font-bold mt-4">{product.name[finalLocale]}</h1>
-
-      <p className="mt-2">{product.description[finalLocale]}</p>
-
-      <p className="mt-4 font-semibold">${product.price}</p>
-    </div>
-  );
 }

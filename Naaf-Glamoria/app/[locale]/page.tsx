@@ -1,22 +1,25 @@
 import Hero from "@/components/hero";
 import { getDictionary } from "@/lib/i18n";
 import ProductGrid from "@/components/product/ProductGrid";
+import { getProductsServer } from "@/lib/api/product";
 
 export default async function Page({
   params,
 }: {
   params: Promise<{ locale: string }>;
 }) {
-  const resolvedParams = await params;
+  const { locale } = await params;
+  const finalLocale = locale === "ar" ? "ar" : "en";
 
-  const locale = resolvedParams.locale === "ar" ? "ar" : "en";
+  const dict = getDictionary(finalLocale);
 
-  const dict = getDictionary(locale);
+  const data = await getProductsServer();
+  const products = data.products;
 
   return (
     <>
-      <Hero dict={dict} locale={locale} />;
-      <ProductGrid locale={locale} />
+      <Hero dict={dict} locale={finalLocale} />
+      <ProductGrid products={products} locale={finalLocale} />
     </>
   );
 }

@@ -19,7 +19,7 @@ const dictionaries = {
     shop: "تسوق",
     collections: "مجموعات",
     values: "قيمنا",
-    about: "تواصل معنا",
+    about: "من نحن",
     contact: "اتصل بنا",
     search: "بحث",
     wishlist: "قائمة الأمنيات",

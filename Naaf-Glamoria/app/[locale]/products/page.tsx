@@ -1,23 +1,32 @@
-import { products } from "@/lib/mockProducts";
-import ProductCard from "@/components/product/ProductCard";
+import ProductListClient from "@/components/product/ProductListClient";
+import { Product } from "@/types/product";
+
+type ProductResponse = {
+  success: boolean;
+  products: Product[];
+};
 
 export default async function ProductsPage({
-  params,
+    params,
 }: {
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
   const finalLocale = locale === "ar" ? "ar" : "en";
 
+  console.log("Page locale:", finalLocale);
+
+  const res = await fetch(
+  `${process.env.NEXT_PUBLIC_API_URL}/api/v1/products`,
+  { next: { revalidate: 60 } }
+);
+
+  const data: ProductResponse = await res.json();
+
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 p-8">
-      {products.map((product) => (
-        <ProductCard
-          key={product.id}
-          product={product}
-          locale={finalLocale}
-        />
-      ))}
-    </div>
+    <ProductListClient
+      initialProducts={data.products}
+      locale={finalLocale}
+    />
   );
 }

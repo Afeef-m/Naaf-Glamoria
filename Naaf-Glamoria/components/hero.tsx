@@ -50,7 +50,7 @@ export default function Hero({
         />
       </div>
 
-      <div className="lg:hidden w-full">
+      <div className="lg:hidden relative w-full h-[70vh]">
         <Image
           src="/images/homePageImages/mobile.jpeg"
           alt="Naaf Glamoria Background"
@@ -97,7 +97,7 @@ export default function Hero({
 
                 <motion.div variants={itemVariants} className="pt-4">
                   <a
-                    href="https://wa.me/918590715189?text=Hi%20Naaf%20Glamoria..."
+                    href="https://wa.me/918590715189?text=Hi%20Naaf%20Glamoria,%20I%E2%80%99m%20interested%20in%20your%20unique%20jewelry%20collection.%20Could%20you%20help%20me%20find%20the%20perfect%20piece?"
                     target="_blank"
                     className="px-6 py-3 border border-[#154415] rounded-full text-[#154415] hover:bg-[#154415] hover:text-white transition"
                   >
@@ -107,6 +107,7 @@ export default function Hero({
               </motion.div>
             </div>
 
+            {/* Desktop View */}
             <div className="hidden lg:flex h-full flex-col justify-center items-center pr-32 xl:pr-48 text-center">
               <motion.div
                 variants={containerVariants}
