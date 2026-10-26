@@ -16,7 +16,7 @@ type SingleProductResponse = {
 export async function getProductsServer(query = "") {
   return serverFetch<ProductResponse>(
     `/products${query}`,
-    60
+    0
   );
 }
 

@@ -42,17 +42,19 @@ params:Promise< { locale: string }>;
 
   const dict = getDictionary(finalLocale);
 
+ 
   return (
-    <html lang={finalLocale} dir={finalLocale === "ar" ? "rtl" : "ltr"}>
-       <body
-        className={`${caslon.variable} ${libreCaslon.variable} ${montserrat.variable} ${almarai.variable} antialiased`}
-      >
-        <Providers>
-          <Navbar dict={dict} locale={finalLocale} />
-          {children}
-          <Footer/>
-        </Providers>
-      </body>
-    </html>
+    <div
+      lang={finalLocale}
+      dir={finalLocale === "ar" ? "rtl" : "ltr"}
+      className={`${caslon.variable} ${libreCaslon.variable} ${montserrat.variable} ${almarai.variable} antialiased`}
+    >
+      <Providers>
+        <Navbar dict={dict} locale={finalLocale} />
+        {children}
+        <Footer />
+      </Providers>
+    </div>
   );
+
 }
