@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import adminApi from "@/lib/api/admin-client";
@@ -20,6 +19,37 @@ type CategoriesResponse = {
   categories: Category[];
 };
 
+type UploadSignatureResponse = {
+  success: boolean;
+  data: {
+    timestamp: number;
+    signature: string;
+    cloudName: string;
+    apiKey: string;
+    publicId: string;
+    overwrite: boolean;
+  };
+};
+
+type CloudinaryUploadResponse = {
+  public_id: string;
+  secure_url: string;
+  bytes: number;
+  format: string;
+};
+
+type ProductImage = {
+  id: string;
+  file: File;
+  previewUrl: string;
+  publicId?: string;
+  secureUrl?: string;
+};
+
+const MAX_IMAGES = 5;
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
 export default function NewProductPage() {
   const router = useRouter();
 
@@ -28,6 +58,9 @@ export default function NewProductPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [images, setImages] = useState<ProductImage[]>([]);
+  const imagesRef = useRef<ProductImage[]>([]);
+  const [uploadingImages, setUploadingImages] = useState(false);
 
   const [form, setForm] = useState({
     nameEn: "",
@@ -47,8 +80,7 @@ export default function NewProductPage() {
 
     async function loadCategories() {
       try {
-        const response =
-          await adminApi.get<CategoriesResponse>("/categories");
+        const response = await adminApi.get<CategoriesResponse>("/categories");
 
         if (!response.data.success) {
           throw new Error("Unable to load categories");
@@ -59,9 +91,7 @@ export default function NewProductPage() {
         }
       } catch {
         if (!cancelled) {
-          setError(
-            "Could not load categories. Please sign in again or retry."
-          );
+          setError("Could not load categories. Please sign in again or retry.");
         }
       } finally {
         if (!cancelled) {
@@ -77,10 +107,19 @@ export default function NewProductPage() {
     };
   }, []);
 
-  function updateField(
-    field: keyof typeof form,
-    value: string | boolean
-  ) {
+  useEffect(() => {
+    imagesRef.current = images;
+  }, [images]);
+
+  useEffect(() => {
+    return () => {
+      imagesRef.current.forEach((image) => {
+        URL.revokeObjectURL(image.previewUrl);
+      });
+    };
+  }, []);
+
+  function updateField(field: keyof typeof form, value: string | boolean) {
     setForm((current) => ({
       ...current,
       [field]: value,
@@ -92,11 +131,106 @@ export default function NewProductPage() {
       ...current,
       nameEn: value,
       slug:
-        current.slug === "" ||
-        current.slug === slugify(current.nameEn)
+        current.slug === "" || current.slug === slugify(current.nameEn)
           ? slugify(value)
           : current.slug,
     }));
+  }
+
+  function handleImageSelection(event: React.ChangeEvent<HTMLInputElement>) {
+    const selectedFiles = Array.from(event.target.files ?? []);
+    event.target.value = "";
+
+    setError("");
+
+    const remainingSlots = MAX_IMAGES - images.length;
+    if (remainingSlots <= 0) {
+      setError(`You can add a maximum of ${MAX_IMAGES} images.`);
+      return;
+    }
+
+    const acceptedFiles: File[] = [];
+
+    for (const file of selectedFiles) {
+      if (acceptedFiles.length >= remainingSlots) {
+        setError(`You can add a maximum of ${MAX_IMAGES} images.`);
+        break;
+      }
+
+      if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+        setError(`${file.name}: only JPEG, PNG and WebP images are allowed.`);
+        continue;
+      }
+
+      if (file.size > MAX_IMAGE_SIZE) {
+        setError(`${file.name}: image size must be 5 MB or smaller.`);
+        continue;
+      }
+
+      acceptedFiles.push(file);
+    }
+
+    const newImages = acceptedFiles.map((file) => ({
+      id: crypto.randomUUID(),
+      file,
+      previewUrl: URL.createObjectURL(file),
+    }));
+
+    setImages((current) => [...current, ...newImages]);
+  }
+
+  function removeImage(imageId: string) {
+    setImages((current) => {
+      const imageToRemove = current.find((image) => image.id === imageId);
+      if (imageToRemove) {
+        URL.revokeObjectURL(imageToRemove.previewUrl);
+      }
+      return current.filter((image) => image.id !== imageId);
+    });
+  }
+
+  async function uploadProductImage(
+    image: ProductImage,
+  ): Promise<ProductImage> {
+    if (image.publicId) return image;
+
+    const signatureResponse = await adminApi.post<UploadSignatureResponse>(
+      "/products/upload-signature",
+      {},
+    );
+
+    if (!signatureResponse.data?.success || !signatureResponse.data.data) {
+      throw new Error("Could not authorize image upload.");
+    }
+
+    const { timestamp, signature, cloudName, apiKey, publicId, overwrite } =
+      signatureResponse.data.data;
+
+    const uploadForm = new FormData();
+    uploadForm.append("file", image.file);
+    uploadForm.append("api_key", apiKey);
+    uploadForm.append("timestamp", String(timestamp));
+    uploadForm.append("signature", signature);
+    uploadForm.append("public_id", publicId);
+    uploadForm.append("overwrite", String(overwrite));
+
+    const uploadResponse = await axios.post<CloudinaryUploadResponse>(
+      `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+      uploadForm,
+      { timeout: 120_000 },
+    );
+
+    if (!uploadResponse.data?.public_id || !uploadResponse.data?.secure_url) {
+      throw new Error(
+        `Cloudinary did not confirm the upload for ${image.file.name}.`,
+      );
+    }
+
+    return {
+      ...image,
+      publicId: uploadResponse.data.public_id,
+      secureUrl: uploadResponse.data.secure_url,
+    };
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -106,9 +240,7 @@ export default function NewProductPage() {
 
     const price = Number(form.price);
     const originalPrice =
-      form.originalPrice.trim() === ""
-        ? undefined
-        : Number(form.originalPrice);
+      form.originalPrice.trim() === "" ? undefined : Number(form.originalPrice);
     const stock = Number(form.stock);
 
     if (!form.category) {
@@ -128,17 +260,25 @@ export default function NewProductPage() {
       return;
     }
 
-    if (
-      originalPrice !== undefined &&
-      originalPrice < price
-    ) {
-      setError("Original price should be equal to or greater than the selling price.");
+    if (originalPrice !== undefined && originalPrice < price) {
+      setError(
+        "Original price should be equal to or greater than the selling price.",
+      );
       return;
     }
 
     setSaving(true);
 
     try {
+      setUploadingImages(true);
+
+      const uploadedImages: ProductImage[] = [];
+      for (const image of images) {
+        uploadedImages.push(await uploadProductImage(image));
+      }
+      setImages(uploadedImages);
+      setUploadingImages(false);
+
       const payload = {
         slug: slugify(form.slug),
         name: {
@@ -152,20 +292,15 @@ export default function NewProductPage() {
         category: form.category,
         price,
         ...(originalPrice !== undefined ? { originalPrice } : {}),
-        images: [],
+        imagePublicIds: uploadedImages.map((image) => image.publicId!),
         isFeatured: form.isFeatured,
         stock,
       };
 
-      const response = await adminApi.post(
-        "/products",
-        payload
-      );
+      const response = await adminApi.post("/products", payload);
 
       if (!response.data?.success) {
-        throw new Error(
-          response.data?.message || "Product creation failed."
-        );
+        throw new Error(response.data?.message || "Product creation failed.");
       }
 
       setSuccess("Product created successfully.");
@@ -176,7 +311,7 @@ export default function NewProductPage() {
       if (axios.isAxiosError(err)) {
         setError(
           err.response?.data?.message ||
-            `Unable to create product (HTTP ${err.response?.status ?? "network error"}).`
+            `Unable to create product (HTTP ${err.response?.status ?? "network error"}).`,
         );
       } else if (err instanceof Error) {
         setError(err.message);
@@ -184,6 +319,7 @@ export default function NewProductPage() {
         setError("An unexpected error occurred.");
       }
     } finally {
+      setUploadingImages(false);
       setSaving(false);
     }
   }
@@ -259,9 +395,7 @@ export default function NewProductPage() {
                   rows={4}
                   maxLength={5000}
                   value={form.descriptionEn}
-                  onChange={(e) =>
-                    updateField("descriptionEn", e.target.value)
-                  }
+                  onChange={(e) => updateField("descriptionEn", e.target.value)}
                   className={inputClass}
                   placeholder="Describe the jewellery..."
                 />
@@ -274,14 +408,72 @@ export default function NewProductPage() {
                   maxLength={5000}
                   dir="rtl"
                   value={form.descriptionAr}
-                  onChange={(e) =>
-                    updateField("descriptionAr", e.target.value)
-                  }
+                  onChange={(e) => updateField("descriptionAr", e.target.value)}
                   className={inputClass}
                   placeholder="وصف المنتج..."
                 />
               </Field>
             </div>
+          </section>
+
+          <hr />
+
+          <section className="space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold">Product images</h2>
+              <p className="mt-1 text-sm text-neutral-500">
+                Add up to 5 JPEG, PNG or WebP images. Each image must be 5 MB or
+                smaller. Images upload securely when you create the product.
+              </p>
+            </div>
+
+            <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-neutral-300 bg-neutral-50 px-5 py-8 text-center transition hover:border-green-800">
+              <span className="text-sm font-medium text-neutral-800">
+                Choose product images
+              </span>
+              <span className="mt-1 text-xs text-neutral-500">
+                {images.length} of {MAX_IMAGES} images selected
+              </span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                multiple
+                disabled={saving || images.length >= MAX_IMAGES}
+                onChange={handleImageSelection}
+                className="sr-only"
+              />
+            </label>
+
+            {images.length > 0 && (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {images.map((image, index) => (
+                  <div
+                    key={image.id}
+                    className="relative overflow-hidden rounded-lg border bg-white"
+                  >
+                    <img
+                      src={image.previewUrl}
+                      alt={`Product image ${index + 1}`}
+                      className="aspect-square w-full object-cover"
+                    />
+                    <div className="flex items-center justify-between gap-2 p-2">
+                      <span className="truncate text-xs text-neutral-600">
+                        Image {index + 1}
+                        {image.publicId ? " · Uploaded" : ""}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeImage(image.id)}
+                        disabled={saving}
+                        className="shrink-0 text-xs font-medium text-red-600 hover:underline disabled:opacity-50"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
 
           <hr />
@@ -337,9 +529,7 @@ export default function NewProductPage() {
                   min="0"
                   step="0.01"
                   value={form.originalPrice}
-                  onChange={(e) =>
-                    updateField("originalPrice", e.target.value)
-                  }
+                  onChange={(e) => updateField("originalPrice", e.target.value)}
                   className={inputClass}
                   placeholder="28000"
                 />
@@ -362,9 +552,7 @@ export default function NewProductPage() {
               <input
                 type="checkbox"
                 checked={form.isFeatured}
-                onChange={(e) =>
-                  updateField("isFeatured", e.target.checked)
-                }
+                onChange={(e) => updateField("isFeatured", e.target.checked)}
                 className="size-4 accent-green-800"
               />
               <span>
@@ -408,7 +596,11 @@ export default function NewProductPage() {
               disabled={saving || loadingCategories || categories.length === 0}
               className="rounded-lg bg-black px-6 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {saving ? "Saving..." : "Create product"}
+              {saving
+                ? uploadingImages
+                  ? "Uploading images..."
+                  : "Creating product..."
+                : "Create product"}
             </button>
           </div>
         </form>
