@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -6,6 +5,8 @@ import Link from "next/link";
 import axios from "axios";
 import adminApi from "@/lib/api/admin-client";
 import type { Product } from "@/types/product";
+import { getOptimizedCloudinaryUrl } from "@/lib/cloudinary";
+import Image from "next/image";
 
 type ProductsResponse = {
   success: boolean;
@@ -44,20 +45,15 @@ export default function AdminProductsPage() {
       }
 
       // Use the authenticated Next.js proxy, not the public backend URL.
-      const response =
-        await adminApi.get<ProductsResponse>("/products");
+      const response = await adminApi.get<ProductsResponse>("/products");
 
-      if (!response.data?.success ||
-          !Array.isArray(response.data.products)) {
+      if (!response.data?.success || !Array.isArray(response.data.products)) {
         throw new Error("The server returned an invalid product list.");
       }
 
       setProducts(response.data.products);
     } catch (err: unknown) {
-      if (
-        axios.isAxiosError(err) &&
-        err.response?.status === 401
-      ) {
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
         window.location.assign("/admin/login");
         return;
       }
@@ -65,7 +61,7 @@ export default function AdminProductsPage() {
       setError(
         err instanceof Error
           ? err.message
-          : "Unable to load products. Please try again."
+          : "Unable to load products. Please try again.",
       );
     } finally {
       setLoading(false);
@@ -88,13 +84,13 @@ export default function AdminProductsPage() {
         product.slug,
         product.category?.name?.en,
         product.category?.name?.ar,
-      ].some((value) => value?.toLowerCase().includes(term))
+      ].some((value) => value?.toLowerCase().includes(term)),
     );
   }, [products, search]);
 
   async function handleDelete(product: Product) {
     const confirmed = window.confirm(
-      `Delete "${product.name.en}"? This action cannot be undone.`
+      `Delete "${product.name.en}"? This action cannot be undone.`,
     );
 
     if (!confirmed) return;
@@ -105,35 +101,29 @@ export default function AdminProductsPage() {
 
     try {
       const response = await adminApi.delete(
-        `/products/${encodeURIComponent(product._id)}`
+        `/products/${encodeURIComponent(product._id)}`,
       );
 
       if (response.data?.success !== true) {
-        throw new Error(
-          response.data?.message || "Product deletion failed."
-        );
+        throw new Error(response.data?.message || "Product deletion failed.");
       }
 
       setProducts((current) =>
-        current.filter((item) => item._id !== product._id)
+        current.filter((item) => item._id !== product._id),
       );
       setNotice(`${product.name.en} was deleted successfully.`);
     } catch (err: unknown) {
-      if (
-        axios.isAxiosError(err) &&
-        err.response?.status === 401
-      ) {
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
         window.location.assign("/admin/login");
         return;
       }
 
       setError(
         axios.isAxiosError(err)
-          ? err.response?.data?.message ||
-              "Unable to delete product."
+          ? err.response?.data?.message || "Unable to delete product."
           : err instanceof Error
             ? err.message
-            : "Unable to delete product."
+            : "Unable to delete product.",
       );
     } finally {
       setDeletingId(null);
@@ -266,7 +256,9 @@ export default function AdminProductsPage() {
                     <th className="px-3 py-4 font-medium">Price</th>
                     <th className="px-3 py-4 font-medium">Stock</th>
                     <th className="px-3 py-4 font-medium">Featured</th>
-                    <th className="px-3 py-4 text-right font-medium">Actions</th>
+                    <th className="px-3 py-4 text-right font-medium">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
 
@@ -279,10 +271,12 @@ export default function AdminProductsPage() {
                       <td className="px-3 py-4">
                         <div className="flex items-center gap-3">
                           {product.images?.[0] ? (
-                            <img
-                              src={product.images[0]}
+                            <Image
+                              src={getOptimizedCloudinaryUrl(product.images[0])}
                               alt={product.name.en}
-                              className="h-12 w-12 rounded-lg border border-neutral-200 object-cover"
+                              width={500}
+                              height={500}
+                              className="h-full w-full object-cover"
                             />
                           ) : (
                             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-neutral-100 text-xs text-neutral-400">

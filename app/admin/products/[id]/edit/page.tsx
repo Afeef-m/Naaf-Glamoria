@@ -1,7 +1,12 @@
-
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import axios from "axios";
@@ -14,10 +19,51 @@ type Category = {
   slug: string;
 };
 
+type ProductImageAsset = {
+  url: string;
+  publicId: string;
+};
+
+type AdminProduct = Product & {
+  imageAssets?: ProductImageAsset[];
+};
+
 type ProductListResponse = {
   success: boolean;
-  products: Product[];
+  products: AdminProduct[];
 };
+
+type UploadSignatureResponse = {
+  success: boolean;
+  data: {
+    timestamp: number;
+    signature: string;
+    cloudName: string;
+    apiKey: string;
+    publicId: string;
+    overwrite: boolean;
+  };
+};
+
+type CloudinaryUploadResponse = {
+  public_id: string;
+  secure_url: string;
+  bytes: number;
+  format: string;
+};
+
+type EditableImage = {
+  key: string;
+  kind: "existing" | "new";
+  url: string;
+  publicId: string;
+  file?: File;
+  previewUrl?: string;
+};
+
+const MAX_IMAGES = 5;
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 type CategoriesResponse = {
   success: boolean;
@@ -73,7 +119,10 @@ export default function EditProductPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [loadedProduct, setLoadedProduct] = useState<Product | null>(null);
+  const [loadedProduct, setLoadedProduct] = useState<AdminProduct | null>(null);
+  const [images, setImages] = useState<EditableImage[]>([]);
+  const imagesRef = useRef<EditableImage[]>([]);
+  const [uploadingImages, setUploadingImages] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -87,28 +136,40 @@ export default function EditProductPage() {
         adminApi.get<CategoriesResponse>("/categories"),
       ]);
 
-      if (!productResponse.data?.success ||
-          !Array.isArray(productResponse.data.products)) {
+      if (
+        !productResponse.data?.success ||
+        !Array.isArray(productResponse.data.products)
+      ) {
         throw new Error("Invalid products response.");
       }
 
-      if (!categoryResponse.data?.success ||
-          !Array.isArray(categoryResponse.data.categories)) {
+      if (
+        !categoryResponse.data?.success ||
+        !Array.isArray(categoryResponse.data.categories)
+      ) {
         throw new Error("Invalid categories response.");
       }
 
       const product = productResponse.data.products.find(
-        (item) => item._id === id
+        (item) => item._id === id,
       );
 
       if (!product) {
         throw new Error(
-          "Product not found. Return to the product list and try again."
+          "Product not found. Return to the product list and try again.",
         );
       }
 
       setLoadedProduct(product);
       setCategories(categoryResponse.data.categories);
+      setImages(
+        (product.imageAssets ?? []).map((asset, index) => ({
+          key: `existing-${asset.publicId}-${index}`,
+          kind: "existing" as const,
+          url: asset.url,
+          publicId: asset.publicId,
+        })),
+      );
 
       setForm({
         slug: product.slug ?? "",
@@ -119,20 +180,15 @@ export default function EditProductPage() {
         category:
           typeof product.category === "string"
             ? product.category
-            : product.category?._id ?? "",
+            : (product.category?._id ?? ""),
         price: String(product.price ?? ""),
         originalPrice:
-          product.originalPrice != null
-            ? String(product.originalPrice)
-            : "",
+          product.originalPrice != null ? String(product.originalPrice) : "",
         stock: String(product.stock ?? 0),
         isFeatured: Boolean(product.isFeatured),
       });
     } catch (err: unknown) {
-      if (
-        axios.isAxiosError(err) &&
-        err.response?.status === 401
-      ) {
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
         router.replace("/admin/login");
         return;
       }
@@ -147,9 +203,134 @@ export default function EditProductPage() {
     void loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    imagesRef.current = images;
+  }, [images]);
+
+  useEffect(() => {
+    return () => {
+      imagesRef.current.forEach((image) => {
+        if (image.kind === "new" && image.previewUrl) {
+          URL.revokeObjectURL(image.previewUrl);
+        }
+      });
+    };
+  }, []);
+
+  function handleImageSelection(event: React.ChangeEvent<HTMLInputElement>) {
+    const selectedFiles = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    setError("");
+
+    const remainingSlots = MAX_IMAGES - images.length;
+    if (remainingSlots <= 0) {
+      setError(`You can add a maximum of ${MAX_IMAGES} images.`);
+      return;
+    }
+
+    const acceptedFiles: File[] = [];
+
+    for (const file of selectedFiles) {
+      if (acceptedFiles.length >= remainingSlots) {
+        setError(`You can add a maximum of ${MAX_IMAGES} images.`);
+        break;
+      }
+
+      if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+        setError(`${file.name}: only JPEG, PNG and WebP images are allowed.`);
+        continue;
+      }
+
+      if (file.size > MAX_IMAGE_SIZE) {
+        setError(`${file.name}: image size must be 5 MB or smaller.`);
+        continue;
+      }
+
+      acceptedFiles.push(file);
+    }
+
+    const newImages: EditableImage[] = acceptedFiles.map((file) => ({
+      key: crypto.randomUUID(),
+      kind: "new",
+      url: "",
+      publicId: "",
+      file,
+      previewUrl: URL.createObjectURL(file),
+    }));
+
+    setImages((current) => [...current, ...newImages]);
+  }
+
+  function removeImage(key: string) {
+    setImages((current) => {
+      const target = current.find((image) => image.key === key);
+      if (target?.kind === "new" && target.previewUrl) {
+        URL.revokeObjectURL(target.previewUrl);
+      }
+      return current.filter((image) => image.key !== key);
+    });
+  }
+
+  function moveImage(index: number, direction: -1 | 1) {
+    setImages((current) => {
+      const nextIndex = index + direction;
+      if (nextIndex < 0 || nextIndex >= current.length) return current;
+
+      const reordered = [...current];
+      [reordered[index], reordered[nextIndex]] = [
+        reordered[nextIndex],
+        reordered[index],
+      ];
+      return reordered;
+    });
+  }
+
+  async function uploadProductImage(
+    image: EditableImage,
+  ): Promise<EditableImage> {
+    if (image.publicId) return image;
+    if (!image.file) throw new Error("Selected image file is missing.");
+
+    const signatureResponse = await adminApi.post<UploadSignatureResponse>(
+      "/products/upload-signature",
+      {},
+    );
+
+    if (!signatureResponse.data?.success || !signatureResponse.data.data) {
+      throw new Error("Could not authorize image upload.");
+    }
+
+    const { timestamp, signature, cloudName, apiKey, publicId, overwrite } =
+      signatureResponse.data.data;
+
+    const uploadForm = new FormData();
+    uploadForm.append("file", image.file);
+    uploadForm.append("api_key", apiKey);
+    uploadForm.append("timestamp", String(timestamp));
+    uploadForm.append("signature", signature);
+    uploadForm.append("public_id", publicId);
+    uploadForm.append("overwrite", String(overwrite));
+
+    const uploadResponse = await axios.post<CloudinaryUploadResponse>(
+      `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+      uploadForm,
+      { timeout: 120_000 },
+    );
+
+    if (!uploadResponse.data?.public_id || !uploadResponse.data?.secure_url) {
+      throw new Error(`Cloudinary did not confirm ${image.file.name}.`);
+    }
+
+    return {
+      ...image,
+      publicId: uploadResponse.data.public_id,
+      url: uploadResponse.data.secure_url,
+    };
+  }
+
   function updateField<K extends keyof ProductForm>(
     field: K,
-    value: ProductForm[K]
+    value: ProductForm[K],
   ) {
     setForm((current) => ({ ...current, [field]: value }));
   }
@@ -161,9 +342,7 @@ export default function EditProductPage() {
     const slug = form.slug.trim();
     const price = Number(form.price);
     const originalPrice =
-      form.originalPrice.trim() === ""
-        ? undefined
-        : Number(form.originalPrice);
+      form.originalPrice.trim() === "" ? undefined : Number(form.originalPrice);
     const stock = Number(form.stock);
 
     if (
@@ -195,11 +374,10 @@ export default function EditProductPage() {
       return;
     }
 
-    if (
-      originalPrice !== undefined &&
-      originalPrice < price
-    ) {
-      setError("Original price should be equal to or greater than selling price.");
+    if (originalPrice !== undefined && originalPrice < price) {
+      setError(
+        "Original price should be equal to or greater than selling price.",
+      );
       return;
     }
 
@@ -211,6 +389,27 @@ export default function EditProductPage() {
     setSaving(true);
 
     try {
+      const hasLegacyImages =
+        (loadedProduct?.images?.length ?? 0) > 0 &&
+        (loadedProduct?.imageAssets?.length ?? 0) === 0;
+
+      let uploadedImages = images;
+      if (!hasLegacyImages) {
+        setUploadingImages(true);
+        uploadedImages = [];
+        for (const image of images) {
+          const uploaded = await uploadProductImage(image);
+          uploadedImages.push(uploaded);
+          setImages((current) =>
+            current.map((item) =>
+              item.key === uploaded.key ? uploaded : item,
+            ),
+          );
+        }
+        setImages(uploadedImages);
+        setUploadingImages(false);
+      }
+
       const payload = {
         slug,
         name: {
@@ -226,43 +425,38 @@ export default function EditProductPage() {
         ...(originalPrice !== undefined ? { originalPrice } : {}),
         stock,
         isFeatured: form.isFeatured,
-        // Preserve existing image URLs until image management is implemented.
-        images: loadedProduct?.images ?? [],
+        ...(hasLegacyImages
+          ? {}
+          : { imagePublicIds: uploadedImages.map((image) => image.publicId) }),
       };
 
       const response = await adminApi.patch(
         `/products/${encodeURIComponent(id)}`,
-        payload
+        payload,
       );
 
       if (response.data?.success !== true) {
-        throw new Error(
-          response.data?.message || "Product update failed."
-        );
+        throw new Error(response.data?.message || "Product update failed.");
       }
 
       router.push("/admin/products");
       router.refresh();
     } catch (err: unknown) {
-      if (
-        axios.isAxiosError(err) &&
-        err.response?.status === 401
-      ) {
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
         router.replace("/admin/login");
         return;
       }
 
       setError(getErrorMessage(err));
     } finally {
+      setUploadingImages(false);
       setSaving(false);
     }
   }
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-neutral-50 p-8">
-        Loading product...
-      </main>
+      <main className="min-h-screen bg-neutral-50 p-8">Loading product...</main>
     );
   }
 
@@ -279,10 +473,7 @@ export default function EditProductPage() {
         >
           Retry
         </button>
-        <Link
-          href="/admin/products"
-          className="ml-3 text-sm underline"
-        >
+        <Link href="/admin/products" className="ml-3 text-sm underline">
           Back to products
         </Link>
       </main>
@@ -363,9 +554,7 @@ export default function EditProductPage() {
                   rows={4}
                   className={inputClass}
                   value={form.descriptionEn}
-                  onChange={(e) =>
-                    updateField("descriptionEn", e.target.value)
-                  }
+                  onChange={(e) => updateField("descriptionEn", e.target.value)}
                 />
               </Field>
 
@@ -376,12 +565,125 @@ export default function EditProductPage() {
                   dir="rtl"
                   className={inputClass}
                   value={form.descriptionAr}
-                  onChange={(e) =>
-                    updateField("descriptionAr", e.target.value)
-                  }
+                  onChange={(e) => updateField("descriptionAr", e.target.value)}
                 />
               </Field>
             </div>
+          </section>
+
+          <section className="border-t border-neutral-200 pt-6">
+            <div>
+              <h2 className="text-lg font-semibold">Product images</h2>
+              <p className="mt-1 text-sm text-neutral-500">
+                Add up to 5 JPEG, PNG or WebP images. Each image must be 5 MB or
+                smaller. The first image is used as the primary image.
+              </p>
+            </div>
+
+            {(loadedProduct.imageAssets?.length ?? 0) === 0 &&
+            (loadedProduct.images?.length ?? 0) > 0 ? (
+              <div className="mt-4 space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                <p className="text-sm text-amber-900">
+                  This product has older image URLs without Cloudinary public
+                  IDs. They are preserved as-is. Image editing is disabled for
+                  this product until those images are migrated.
+                </p>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {loadedProduct.images.map((url, index) => (
+                    <div
+                      key={`${url}-${index}`}
+                      className="overflow-hidden rounded-lg border bg-white"
+                    >
+                      <img
+                        src={url}
+                        alt={`Existing product image ${index + 1}`}
+                        className="aspect-square w-full object-cover"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <>
+                <label className="mt-4 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-neutral-300 bg-neutral-50 px-5 py-7 text-center transition hover:border-neutral-800">
+                  <span className="text-sm font-medium text-neutral-800">
+                    Choose product images
+                  </span>
+                  <span className="mt-1 text-xs text-neutral-500">
+                    {images.length} of {MAX_IMAGES} images selected
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    multiple
+                    disabled={saving || images.length >= MAX_IMAGES}
+                    onChange={handleImageSelection}
+                    className="sr-only"
+                  />
+                </label>
+
+                {images.length > 0 && (
+                  <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    {images.map((image, index) => (
+                      <div
+                        key={image.key}
+                        className="overflow-hidden rounded-lg border bg-white"
+                      >
+                        <img
+                          src={
+                            image.kind === "new" ? image.previewUrl : image.url
+                          }
+                          alt={`Product image ${index + 1}`}
+                          className="aspect-square w-full object-cover"
+                        />
+                        <div className="space-y-2 p-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate text-xs text-neutral-600">
+                              {index === 0
+                                ? "Primary image"
+                                : `Image ${index + 1}`}
+                            </span>
+                            <span className="shrink-0 text-[11px] text-neutral-500">
+                              {image.kind === "existing"
+                                ? "Saved"
+                                : image.publicId
+                                  ? "Uploaded"
+                                  : "New"}
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => moveImage(index, -1)}
+                              disabled={saving || index === 0}
+                              className="rounded border px-2 py-1 text-xs disabled:opacity-40"
+                            >
+                              Move left
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moveImage(index, 1)}
+                              disabled={saving || index === images.length - 1}
+                              className="rounded border px-2 py-1 text-xs disabled:opacity-40"
+                            >
+                              Move right
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeImage(image.key)}
+                              disabled={saving}
+                              className="rounded border border-red-200 px-2 py-1 text-xs text-red-600 disabled:opacity-40"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
           </section>
 
           <section className="border-t border-neutral-200 pt-6">
@@ -423,9 +725,7 @@ export default function EditProductPage() {
                   step="0.01"
                   className={inputClass}
                   value={form.originalPrice}
-                  onChange={(e) =>
-                    updateField("originalPrice", e.target.value)
-                  }
+                  onChange={(e) => updateField("originalPrice", e.target.value)}
                 />
               </Field>
 
@@ -448,14 +748,10 @@ export default function EditProductPage() {
               <input
                 type="checkbox"
                 checked={form.isFeatured}
-                onChange={(e) =>
-                  updateField("isFeatured", e.target.checked)
-                }
+                onChange={(e) => updateField("isFeatured", e.target.checked)}
                 className="size-4"
               />
-              <span className="text-sm font-medium">
-                Featured product
-              </span>
+              <span className="text-sm font-medium">Featured product</span>
             </label>
           </section>
 
@@ -472,7 +768,11 @@ export default function EditProductPage() {
               disabled={saving || categories.length === 0}
               className="rounded-lg bg-neutral-900 px-6 py-3 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-50"
             >
-              {saving ? "Saving changes..." : "Save changes"}
+              {saving
+                ? uploadingImages
+                  ? "Uploading images..."
+                  : "Saving changes..."
+                : "Save changes"}
             </button>
           </div>
         </form>
