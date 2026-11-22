@@ -8,6 +8,10 @@ export interface Product {
     name: { en: string; ar: string };
     slug: string;
   };
+  includedItems?: {
+  en: string;
+  ar: string;
+}[];
   price: number;
   originalPrice?: number;
   images: string[];

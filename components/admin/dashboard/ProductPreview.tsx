@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Package } from "lucide-react";
 import { formatPrice } from "@/lib/format-price";
 import type { Product } from "@/types/admin";
+import Image from "next/image";
 
 const PREVIEW_LIMIT = 5;
 
@@ -41,7 +42,7 @@ function ProductRow({ product }: { product: Product }) {
     <div className="flex items-center gap-3 px-5 py-4 transition hover:bg-neutral-50 sm:gap-4 sm:px-6">
       {image ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <Image
           src={image}
           alt={product.name.en}
           className="h-12 w-12 shrink-0 rounded-xl border border-neutral-100 object-cover"

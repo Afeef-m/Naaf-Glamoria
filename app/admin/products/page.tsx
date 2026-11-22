@@ -166,7 +166,7 @@ export default function AdminProductsPage() {
           </Link>
         </div>
 
-        <section className="mt-8 rounded-xl border border-neutral-200 bg-white p-4 sm:p-6">
+        <section className="mt-8 overflow-hidden rounded-xl border border-neutral-200 bg-white p-4 shadow-sm sm:p-6">
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div>
               <h2 className="text-lg font-semibold">All products</h2>
@@ -247,16 +247,16 @@ export default function AdminProductsPage() {
               )}
             </div>
           ) : (
-            <div className="mt-6 overflow-x-auto">
-              <table className="w-full min-w-[850px] text-left text-sm">
-                <thead>
+            <div className="mt-6 overflow-x-auto rounded-lg border border-neutral-200">
+              <table className="w-full min-w-237.5 text-left text-sm">
+                <thead className="bg-neutral-50">
                   <tr className="border-b border-neutral-200 text-xs uppercase tracking-wide text-neutral-500">
-                    <th className="px-3 py-4 font-medium">Product</th>
-                    <th className="px-3 py-4 font-medium">Category</th>
-                    <th className="px-3 py-4 font-medium">Price</th>
-                    <th className="px-3 py-4 font-medium">Stock</th>
-                    <th className="px-3 py-4 font-medium">Featured</th>
-                    <th className="px-3 py-4 text-right font-medium">
+                    <th className="w-[36%] px-5 py-4 font-medium">Product</th>
+                    <th className="w-[16%] px-4 py-4 font-medium">Category</th>
+                    <th className="w-[16%] px-4 py-4 font-medium">Price</th>
+                    <th className="w-[10%] px-4 py-4 font-medium">Stock</th>
+                    <th className="w-[10%] px-4 py-4 font-medium">Featured</th>
+                    <th className="w-[12%] px-4 py-4 text-right font-medium">
                       Actions
                     </th>
                   </tr>
@@ -266,41 +266,54 @@ export default function AdminProductsPage() {
                   {filteredProducts.map((product) => (
                     <tr
                       key={product._id}
-                      className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50"
+                      className="border-b border-neutral-100 last:border-0 transition-colors hover:bg-neutral-50/70"
                     >
-                      <td className="px-3 py-4">
-                        <div className="flex items-center gap-3">
-                          {product.images?.[0] ? (
-                            <Image
-                              src={getOptimizedCloudinaryUrl(product.images[0])}
-                              alt={product.name.en}
-                              width={500}
-                              height={500}
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-neutral-100 text-xs text-neutral-400">
-                              No image
-                            </div>
-                          )}
+                      {/* Product */}
+                      <td className="px-5 py-4">
+                        <div className="flex min-w-0 items-center gap-4">
+                          <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-neutral-200 bg-neutral-100">
+                            {product.images?.[0] ? (
+                              <Image
+                                src={getOptimizedCloudinaryUrl(
+                                  product.images[0],
+                                )}
+                                alt={product.name.en}
+                                fill
+                                sizes="64px"
+                                className="object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-full items-center justify-center text-[10px] text-neutral-400">
+                                No image
+                              </div>
+                            )}
+                          </div>
 
-                          <div>
-                            <p className="font-medium text-neutral-900">
+                          <div className="min-w-0">
+                            <p className="truncate font-medium text-neutral-900">
                               {product.name.en}
                             </p>
-                            <p className="mt-1 text-xs text-neutral-500">
+                            <p className="mt-1 truncate text-xs text-neutral-500">
                               {product.slug}
+                            </p>
+                            <p className="mt-1 text-xs text-neutral-400">
+                              {product.images?.length ?? 0} images
                             </p>
                           </div>
                         </div>
                       </td>
 
-                      <td className="px-3 py-4 text-neutral-600">
+                      {/* Category */}
+                      <td className="px-4 py-4 text-neutral-600">
                         {product.category?.name?.en || "Uncategorized"}
                       </td>
 
-                      <td className="px-3 py-4 font-medium text-neutral-900">
-                        {formatPrice(product.price)}
+                      {/* Price */}
+                      <td className="px-4 py-4">
+                        <p className="font-medium text-neutral-900">
+                          {formatPrice(product.price)}
+                        </p>
+
                         {product.originalPrice != null &&
                           product.originalPrice > product.price && (
                             <p className="mt-1 text-xs text-neutral-400 line-through">
@@ -309,25 +322,28 @@ export default function AdminProductsPage() {
                           )}
                       </td>
 
-                      <td className="px-3 py-4 text-neutral-600">
+                      {/* Stock */}
+                      <td className="px-4 py-4 text-neutral-600">
                         {product.stock ?? 0}
                       </td>
 
-                      <td className="px-3 py-4">
+                      {/* Featured */}
+                      <td className="px-4 py-4">
                         {product.isFeatured ? (
-                          <span className="rounded-full bg-green-50 px-2.5 py-1 text-xs text-green-700">
-                            Yes
+                          <span className="inline-flex rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-700">
+                            Featured
                           </span>
                         ) : (
-                          <span className="text-neutral-400">No</span>
+                          <span className="text-xs text-neutral-400">No</span>
                         )}
                       </td>
 
-                      <td className="px-3 py-4">
+                      {/* Actions */}
+                      <td className="px-4 py-4">
                         <div className="flex justify-end gap-2">
                           <Link
                             href={`/admin/products/${encodeURIComponent(product._id)}/edit`}
-                            className="rounded-md border border-neutral-300 px-3 py-2 text-xs font-medium hover:bg-neutral-100"
+                            className="rounded-md border border-neutral-300 px-3 py-2 text-xs font-medium text-neutral-700 transition hover:border-neutral-900 hover:bg-neutral-900 hover:text-white"
                           >
                             Edit
                           </Link>
@@ -336,7 +352,7 @@ export default function AdminProductsPage() {
                             type="button"
                             onClick={() => void handleDelete(product)}
                             disabled={deletingId === product._id}
-                            className="rounded-md border border-red-200 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                            className="rounded-md border border-red-200 px-3 py-2 text-xs font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-50"
                           >
                             {deletingId === product._id
                               ? "Deleting..."

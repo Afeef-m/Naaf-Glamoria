@@ -1,70 +1,80 @@
-import { getProductBySlugServer } from "@/lib/api/product";
-import { IndianRupee } from "lucide-react";
-import Image from "next/image";
+import {
+  getProductBySlugServer,
+  getRelatedProductsServer,
+} from "@/lib/api/product";
+
+import { Product } from "@/types/product";
 import { notFound } from "next/navigation";
+import ProductDetailClient from "./ProductDetailClient";
 
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ locale: string; slug: string }>;
-}) {
+type Props = {
+  params: Promise<{
+    locale: string;
+    slug: string;
+  }>;
+};
+
+export async function generateMetadata({ params }: Props) {
   const { locale, slug } = await params;
+  const lang = locale === "ar" ? "ar" : "en";
 
-  const data = await getProductBySlugServer(slug);
-  const product = data.data;
+  try {
+    const response = await getProductBySlugServer(slug);
+    const product = response.data;
 
-  return {
-    title: product.name[locale === "ar" ? "ar" : "en"],
-    description: product.description[locale === "ar" ? "ar" : "en"],
-  };
+    if (!product) {
+      return {
+        title: "Product Not Found | Naaf Glamoria",
+      };
+    }
+
+    return {
+      title: `${product.name[lang]} | Naaf Glamoria`,
+      description: product.description[lang],
+    };
+  } catch {
+    return {
+      title: "Product Not Found | Naaf Glamoria",
+    };
+  }
 }
 
-export default async function ProductDetailPage({
-  params,
-}: {
-  params: Promise<{ locale: string; slug: string }>;
-}) {
+export default async function ProductDetailPage({ params }: Props) {
   const { locale, slug } = await params;
   const finalLocale = locale === "ar" ? "ar" : "en";
 
   try {
-    const data = await getProductBySlugServer(slug);
-    const product = data.data;
+    // 1. Fetch current product
+    const response = await getProductBySlugServer(slug);
+    const product = response.data;
 
-    if (!product) return notFound();
+    if (!product) {
+      notFound();
+    }
 
+    // 2. Fetch related products
+    let relatedProducts: Product[] = [];
+
+    if (product.category?._id) {
+      try {
+        relatedProducts = await getRelatedProductsServer(
+          product.category._id,
+          product._id,
+        );
+      } catch (error) {
+        console.error("Related products fetching failed:", error);
+      }
+    }
+
+    // 3. Render product page
     return (
-      <div className="max-w-6xl mx-auto px-6 py-16 grid md:grid-cols-2 gap-12">
-        <div className="relative w-full aspect-square bg-gray-100 rounded-2xl overflow-hidden">
-          <Image
-            src={product.images?.[0] ?? "/images/products/p-placeholder.jpg"}
-            alt={product.name[finalLocale]}
-            fill
-            className="object-cover"
-          />
-        </div>
-
-        <div className="space-y-6">
-          <p className="text-sm uppercase tracking-wide text-gray-400">
-            {product.category?.name?.[finalLocale]}
-          </p>
-
-          <h1 className="text-3xl font-semibold text-[#154415]">
-            {product.name[finalLocale]}
-          </h1>
-
-          <p className="text-gray-600 leading-relaxed">
-            {product.description[finalLocale]}
-          </p>
-
-          <div className="flex items-center gap-2 text-2xl font-bold text-[#154415]">
-            <IndianRupee className="w-5 h-5" />
-            {product.price}
-          </div>
-        </div>
-      </div>
+      <ProductDetailClient
+        product={product}
+        locale={finalLocale}
+        relatedProducts={relatedProducts}
+      />
     );
   } catch {
-    return notFound();
+    notFound();
   }
 }

@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import adminApi from "@/lib/api/admin-client";
+import Image from "next/image";
+import Link from "next/link";
 
 type Category = {
   _id: string;
@@ -61,6 +63,9 @@ export default function NewProductPage() {
   const [images, setImages] = useState<ProductImage[]>([]);
   const imagesRef = useRef<ProductImage[]>([]);
   const [uploadingImages, setUploadingImages] = useState(false);
+  const [includedItems, setIncludedItems] = useState<
+    { en: string; ar: string }[]
+  >([]);
 
   const [form, setForm] = useState({
     nameEn: "",
@@ -124,6 +129,26 @@ export default function NewProductPage() {
       ...current,
       [field]: value,
     }));
+  }
+
+  function addIncludedItem() {
+    setIncludedItems((current) => [...current, { en: "", ar: "" }]);
+  }
+
+  function updateIncludedItem(
+    index: number,
+    field: "en" | "ar",
+    value: string,
+  ) {
+    setIncludedItems((current) =>
+      current.map((item, i) =>
+        i === index ? { ...item, [field]: value } : item,
+      ),
+    );
+  }
+
+  function removeIncludedItem(index: number) {
+    setIncludedItems((current) => current.filter((_, i) => i !== index));
   }
 
   function handleNameChange(value: string) {
@@ -293,6 +318,12 @@ export default function NewProductPage() {
         price,
         ...(originalPrice !== undefined ? { originalPrice } : {}),
         imagePublicIds: uploadedImages.map((image) => image.publicId!),
+        includedItems: includedItems
+          .map((item) => ({
+            en: item.en.trim(),
+            ar: item.ar.trim(),
+          }))
+          .filter((item) => item.en || item.ar),
         isFeatured: form.isFeatured,
         stock,
       };
@@ -327,12 +358,12 @@ export default function NewProductPage() {
   return (
     <main className="min-h-screen bg-neutral-50 px-4 py-8 sm:px-8">
       <div className="mx-auto max-w-3xl">
-        <a
+        <Link
           href="/admin/products"
           className="text-sm text-neutral-600 hover:underline"
         >
           ← Back to products
-        </a>
+        </Link>
 
         <h1 className="mt-5 text-3xl font-semibold text-green-950">
           Add product
@@ -420,6 +451,62 @@ export default function NewProductPage() {
 
           <section className="space-y-4">
             <div>
+              <h2 className="text-lg font-semibold">{"What's in the box?"}</h2>
+              <p className="mt-1 text-sm text-neutral-500">
+                Add the items included with this jewellery product.
+              </p>
+            </div>
+
+            {includedItems.map((item, index) => (
+              <div
+                key={index}
+                className="grid gap-3 rounded-lg border border-neutral-200 p-4 sm:grid-cols-2"
+              >
+                <Field label={`Item ${index + 1} (English)`}>
+                  <input
+                    value={item.en}
+                    onChange={(e) =>
+                      updateIncludedItem(index, "en", e.target.value)
+                    }
+                    className={inputClass}
+                    placeholder="Jewellery Storage Box"
+                    maxLength={150}
+                  />
+                </Field>
+
+                <Field label={`Item ${index + 1} (Arabic)`}>
+                  <input
+                    dir="rtl"
+                    value={item.ar}
+                    onChange={(e) =>
+                      updateIncludedItem(index, "ar", e.target.value)
+                    }
+                    className={inputClass}
+                    placeholder="علبة مجوهرات"
+                    maxLength={150}
+                  />
+                </Field>
+
+                <button
+                  type="button"
+                  onClick={() => removeIncludedItem(index)}
+                  className="text-left text-sm text-red-600 hover:underline sm:col-span-2"
+                >
+                  Remove item
+                </button>
+              </div>
+            ))}
+
+            <button
+              type="button"
+              onClick={addIncludedItem}
+              className="rounded-lg border border-neutral-300 px-4 py-2.5 text-sm font-medium hover:bg-neutral-50"
+            >
+              + Add item
+            </button>
+          </section>
+          <section className="space-y-4">
+            <div>
               <h2 className="text-lg font-semibold">Product images</h2>
               <p className="mt-1 text-sm text-neutral-500">
                 Add up to 5 JPEG, PNG or WebP images. Each image must be 5 MB or
@@ -451,11 +538,16 @@ export default function NewProductPage() {
                     key={image.id}
                     className="relative overflow-hidden rounded-lg border bg-white"
                   >
-                    <img
-                      src={image.previewUrl}
-                      alt={`Product image ${index + 1}`}
-                      className="aspect-square w-full object-cover"
-                    />
+                    <div className="relative aspect-square w-full">
+                      <Image
+                        src={image.previewUrl}
+                        alt={`Product image ${index + 1}`}
+                        fill
+                        unoptimized
+                        sizes="(max-width: 640px) 50vw, 33vw"
+                        className="object-cover"
+                      />
+                    </div>
                     <div className="flex items-center justify-between gap-2 p-2">
                       <span className="truncate text-xs text-neutral-600">
                         Image {index + 1}

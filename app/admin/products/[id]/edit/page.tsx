@@ -12,6 +12,7 @@ import Link from "next/link";
 import axios from "axios";
 import adminApi from "@/lib/api/admin-client";
 import type { Product } from "@/types/product";
+import Image from "next/image";
 
 type Category = {
   _id: string;
@@ -77,6 +78,7 @@ type ProductForm = {
   descriptionEn: string;
   descriptionAr: string;
   category: string;
+  includedItems: { en: string; ar: string }[];
   price: string;
   originalPrice: string;
   stock: string;
@@ -109,6 +111,7 @@ export default function EditProductPage() {
     descriptionEn: "",
     descriptionAr: "",
     category: "",
+    includedItems: [],
     price: "",
     originalPrice: "",
     stock: "0",
@@ -181,6 +184,10 @@ export default function EditProductPage() {
           typeof product.category === "string"
             ? product.category
             : (product.category?._id ?? ""),
+        includedItems: (product.includedItems ?? []).map((item) => ({
+          en: item.en ?? "",
+          ar: item.ar ?? "",
+        })),
         price: String(product.price ?? ""),
         originalPrice:
           product.originalPrice != null ? String(product.originalPrice) : "",
@@ -335,6 +342,33 @@ export default function EditProductPage() {
     setForm((current) => ({ ...current, [field]: value }));
   }
 
+  function addIncludedItem() {
+    setForm((current) => ({
+      ...current,
+      includedItems: [...current.includedItems, { en: "", ar: "" }],
+    }));
+  }
+
+  function updateIncludedItem(
+    index: number,
+    field: "en" | "ar",
+    value: string,
+  ) {
+    setForm((current) => ({
+      ...current,
+      includedItems: current.includedItems.map((item, i) =>
+        i === index ? { ...item, [field]: value } : item,
+      ),
+    }));
+  }
+
+  function removeIncludedItem(index: number) {
+    setForm((current) => ({
+      ...current,
+      includedItems: current.includedItems.filter((_, i) => i !== index),
+    }));
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -421,6 +455,12 @@ export default function EditProductPage() {
           ar: form.descriptionAr.trim(),
         },
         category: form.category,
+        includedItems: form.includedItems
+          .map((item) => ({
+            en: item.en.trim(),
+            ar: item.ar.trim(),
+          }))
+          .filter((item) => item.en || item.ar),
         price,
         ...(originalPrice !== undefined ? { originalPrice } : {}),
         stock,
@@ -571,6 +611,63 @@ export default function EditProductPage() {
             </div>
           </section>
 
+          <section className="border-t border-neutral-200 pt-6 space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold">{" What's in the box?"}</h2>
+              <p className="mt-1 text-sm text-neutral-500">
+                Add the items included with this jewellery product.
+              </p>
+            </div>
+
+            {form.includedItems.map((item, index) => (
+              <div
+                key={index}
+                className="grid gap-3 rounded-lg border border-neutral-200 p-4 sm:grid-cols-2"
+              >
+                <Field label={`Item ${index + 1} (English)`}>
+                  <input
+                    value={item.en}
+                    onChange={(e) =>
+                      updateIncludedItem(index, "en", e.target.value)
+                    }
+                    className={inputClass}
+                    placeholder="Jewellery Storage Box"
+                    maxLength={150}
+                  />
+                </Field>
+
+                <Field label={`Item ${index + 1} (Arabic)`}>
+                  <input
+                    dir="rtl"
+                    value={item.ar}
+                    onChange={(e) =>
+                      updateIncludedItem(index, "ar", e.target.value)
+                    }
+                    className={inputClass}
+                    placeholder="علبة مجوهرات"
+                    maxLength={150}
+                  />
+                </Field>
+
+                <button
+                  type="button"
+                  onClick={() => removeIncludedItem(index)}
+                  className="text-left text-sm text-red-600 hover:underline sm:col-span-2"
+                >
+                  Remove item
+                </button>
+              </div>
+            ))}
+
+            <button
+              type="button"
+              onClick={addIncludedItem}
+              className="rounded-lg border border-neutral-300 px-4 py-2.5 text-sm font-medium hover:bg-neutral-50"
+            >
+              + Add item
+            </button>
+          </section>
+
           <section className="border-t border-neutral-200 pt-6">
             <div>
               <h2 className="text-lg font-semibold">Product images</h2>
@@ -594,7 +691,7 @@ export default function EditProductPage() {
                       key={`${url}-${index}`}
                       className="overflow-hidden rounded-lg border bg-white"
                     >
-                      <img
+                      <Image
                         src={url}
                         alt={`Existing product image ${index + 1}`}
                         className="aspect-square w-full object-cover"
@@ -629,11 +726,13 @@ export default function EditProductPage() {
                         key={image.key}
                         className="overflow-hidden rounded-lg border bg-white"
                       >
-                        <img
+                        <Image
                           src={
-                            image.kind === "new" ? image.previewUrl : image.url
+                            image.kind === "new" ? image.previewUrl! : image.url
                           }
                           alt={`Product image ${index + 1}`}
+                          width={500}
+                          height={500}
                           className="aspect-square w-full object-cover"
                         />
                         <div className="space-y-2 p-2">

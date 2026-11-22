@@ -87,16 +87,31 @@ export async function POST(request: NextRequest) {
     );
 
     return NextResponse.json(data, { status: 201 });
-  } catch (error: unknown) {
-    if (axios.isAxiosError(error) && error.response) {
-      return NextResponse.json(
-        error.response.data,
-        { status: error.response.status }
-      );
+   } catch (error: unknown) {
+    if (axios.isAxiosError(error)) {
+      console.error("CREATE PRODUCT API ERROR:", {
+        message: error.message,
+        code: error.code,
+        status: error.response?.status,
+        response: error.response?.data,
+        url: error.config?.url,
+      });
+
+      if (error.response) {
+        return NextResponse.json(
+          error.response.data,
+          { status: error.response.status }
+        );
+      }
+    } else {
+      console.error("CREATE PRODUCT UNKNOWN ERROR:", error);
     }
 
     return NextResponse.json(
-      { success: false, message: "Unable to reach the backend" },
+      {
+        success: false,
+        message: "Unable to reach the backend",
+      },
       { status: 502 }
     );
   }
